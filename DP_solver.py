@@ -54,8 +54,14 @@ class DynamicProgramming:
             float
         """
         # TODO: Get reward from the environment and calculate the q-value
-        raise NotImplementedError
 
+       # Step into the environment to get the next state, reward, and done flag
+        next_state, reward, done = self.grid_world.step(state, action)
+        # If the next state is terminal, there's no future value to consider
+        if done:
+            return reward
+        # Otherwise, return the immediate reward plus the discounted future value
+        return reward + self.discount_factor * self.values[next_state]
 
 class IterativePolicyEvaluation(DynamicProgramming):
     def __init__(
@@ -81,17 +87,44 @@ class IterativePolicyEvaluation(DynamicProgramming):
             float: value
         """
         # TODO: Get the value for a state by calculating the q-values
-        raise NotImplementedError
+        action_space = self.grid_world.get_action_space()
+        state_value = 0.0
+        # Sum over all possible actions, weighted by the probability of selecting each action
+        for action in range(action_space):
+            action_probability = self.policy[state, action]  # Probability of taking this action in the given state
+            q_value = self.get_q_value(state, action)  # Compute the Q-value for the state-action pair
+            state_value += action_probability * q_value  # Weight by the action probability
+
+        return state_value
+        # raise NotImplementedError
 
     def evaluate(self):
         """Evaluate the policy and update the values for one iteration"""
         # TODO: Implement the policy evaluation step
-        raise NotImplementedError
+        new_values = np.zeros_like(self.values)  # Initialize a new value array to store updated values
+        
+        # Loop over all states and update the values based on the policy
+        for state in range(self.grid_world.get_state_space()):
+            new_values[state] = self.get_state_value(state)
+        
+        # Update the values with the new values
+        self.values = new_values
+        # raise NotImplementedError
 
     def run(self) -> None:
         """Run the algorithm until convergence."""
         # TODO: Implement the iterative policy evaluation algorithm until convergence
-        raise NotImplementedError
+        while True:
+            old_values = self.values.copy()  # Store the old values to compare for convergence
+            self.evaluate()  # Perform one iteration of policy evaluation
+            
+            # Calculate the maximum change in value across all states
+            delta = np.max(np.abs(self.values - old_values))
+            
+            # Check for convergence (if the maximum change is smaller than the threshold)
+            if delta < self.threshold:
+                break
+        # raise NotImplementedError
 
 
 class PolicyIteration(DynamicProgramming):
