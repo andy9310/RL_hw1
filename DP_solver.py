@@ -117,14 +117,9 @@ class IterativePolicyEvaluation(DynamicProgramming):
         while True:
             old_values = self.values.copy()  # Store the old values to compare for convergence
             self.evaluate()  # Perform one iteration of policy evaluation
-            
-            # Calculate the maximum change in value across all states
-            delta = np.max(np.abs(self.values - old_values))
-            
-            # Check for convergence (if the maximum change is smaller than the threshold)
-            if delta < self.threshold:
+            delta = np.max(np.abs(self.values - old_values)) # Calculate the maximum change in value across all states
+            if delta < self.threshold: # Check for convergence (if the maximum change is smaller than the threshold)
                 break
-        # raise NotImplementedError
 
 
 class PolicyIteration(DynamicProgramming):
@@ -147,21 +142,56 @@ class PolicyIteration(DynamicProgramming):
             float
         """
         # TODO: Get the value for a state by calculating the q-values
-        raise NotImplementedError
+        action = self.policy[state]  # Get the action from the current policy
+        return self.get_q_value(state, action)  # Return the Q-value for this state-action pair
+        # raise NotImplementedError
 
     def policy_evaluation(self):
         """Evaluate the policy and update the values"""
         # TODO: Implement the policy evaluation step
+        while True:
+            new_values = np.zeros_like(self.values)  # Initialize new values for the next iteration
+            # Evaluate the policy for each state
+            for state in range(self.grid_world.get_state_space()):
+                new_values[state] = self.get_state_value(state)
+            # Calculate the difference between old values and new values
+            delta = np.max(np.abs(new_values - self.values))
+            # Update values
+            self.values = new_values
+            # Stop when the change in values is smaller than the threshold (convergence)
+            if delta < self.threshold:
+                break
         raise NotImplementedError
 
     def policy_improvement(self):
         """Improve the policy based on the evaluated values"""
         # TODO: Implement the policy improvement step
+        policy_stable = True
+        # Iterate over all states to update the policy
+        for state in range(self.grid_world.get_state_space()):
+            old_action = self.policy[state]  # Remember the old action
+            action_space = self.grid_world.get_action_space()
+            # Find the action that maximizes the Q-value (greedy improvement)
+            q_values = [self.get_q_value(state, action) for action in range(action_space)]
+            new_action = np.argmax(q_values)
+            # Update the policy with the greedy action
+            self.policy[state] = new_action
+            # Check if the policy has changed
+            if old_action != new_action:
+                policy_stable = False
+        return policy_stable
         raise NotImplementedError
 
     def run(self) -> None:
         """Run the algorithm until convergence"""
         # TODO: Implement the policy iteration algorithm until convergence
+        while True:
+            # Step 1: Policy Evaluation
+            self.policy_evaluation()
+            # Step 2: Policy Improvement
+            if self.policy_improvement():
+                # Step 3: Stop if the policy is stable (i.e., no further changes)
+                break
         raise NotImplementedError
 
 
