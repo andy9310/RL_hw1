@@ -55,9 +55,19 @@ class DynamicProgramming:
         """
         # TODO: Get reward from the environment and calculate the q-value
         next_state, reward, done = self.grid_world.step(state, action)
+        done_flag = 1
         if done:
-            return reward
-        return reward + self.discount_factor * self.values[next_state]
+            done_flag = 0
+        ## since step is 100% to the next_state, transition probability is 1
+        return (reward + self.discount_factor * self.values[next_state] * done_flag)*1
+    def get_q_value_next_state(self, state: int, action: int):
+        next_state, reward, done = self.grid_world.step(state, action)
+        done_flag = 1
+        if done:
+            done_flag = 0
+            return (reward + self.discount_factor * self.values[next_state] * done_flag)*1 , -1
+        ## since step is 100% to the next_state, transition probability is 1
+        return (reward + self.discount_factor * self.values[next_state] * done_flag)*1 , next_state
 
 class IterativePolicyEvaluation(DynamicProgramming):
     def __init__(
@@ -83,38 +93,33 @@ class IterativePolicyEvaluation(DynamicProgramming):
             float: value
         """
         # TODO: Get the value for a state by calculating the q-values
+        # 
         action_space = self.grid_world.get_action_space()
         state_value = 0.0
-        # Sum over all possible actions, weighted by the probability of selecting each action
         for action in range(action_space):
-            action_probability = self.policy[state, action]  # Probability of taking this action in the given state
-            q_value = self.get_q_value(state, action)  # Compute the Q-value for the state-action pair
-            state_value += action_probability * q_value  # Weight by the action probability
+            action_probability = self.policy[state][action] 
+            q_value = self.get_q_value(state, action) 
+            state_value += action_probability * q_value
 
         return state_value
-        # raise NotImplementedError
 
     def evaluate(self):
         """Evaluate the policy and update the values for one iteration"""
         # TODO: Implement the policy evaluation step
-        new_values = np.zeros_like(self.values)  # Initialize a new value array to store updated values
-        
-        # Loop over all states and update the values based on the policy
+        ## since the value function needs to update synchronously
+        new_values = np.zeros_like(self.values) 
         for state in range(self.grid_world.get_state_space()):
             new_values[state] = self.get_state_value(state)
-        
-        # Update the values with the new values
         self.values = new_values
-        # raise NotImplementedError
 
     def run(self) -> None:
         """Run the algorithm until convergence."""
         # TODO: Implement the iterative policy evaluation algorithm until convergence
         while True:
-            old_values = self.values.copy()  # Store the old values to compare for convergence
-            self.evaluate()  # Perform one iteration of policy evaluation
-            delta = np.max(np.abs(self.values - old_values)) # Calculate the maximum change in value across all states
-            if delta < self.threshold: # Check for convergence (if the maximum change is smaller than the threshold)
+            old_values = self.values.copy() 
+            self.evaluate() 
+            delta = np.max(np.abs(self.values - old_values))
+            if delta < self.threshold:
                 break
 
 
@@ -138,57 +143,46 @@ class PolicyIteration(DynamicProgramming):
             float
         """
         # TODO: Get the value for a state by calculating the q-values
-        action = self.policy[state]  # Get the action from the current policy
-        return self.get_q_value(state, action)  # Return the Q-value for this state-action pair
-        # raise NotImplementedError
+        return self.get_q_value(state, self.policy[state]) 
 
     def policy_evaluation(self):
         """Evaluate the policy and update the values"""
         # TODO: Implement the policy evaluation step
         while True:
-            new_values = np.zeros_like(self.values)  # Initialize new values for the next iteration
-            # Evaluate the policy for each state
+            ## since the value function needs to update synchronously
+            new_values = np.zeros_like(self.values)
             for state in range(self.grid_world.get_state_space()):
                 new_values[state] = self.get_state_value(state)
-            # Calculate the difference between old values and new values
             delta = np.max(np.abs(new_values - self.values))
-            # Update values
             self.values = new_values
-            # Stop when the change in values is smaller than the threshold (convergence)
             if delta < self.threshold:
                 break
-        # raise NotImplementedError
 
     def policy_improvement(self):
         """Improve the policy based on the evaluated values"""
         # TODO: Implement the policy improvement step
         policy_stable = True
-        # Iterate over all states to update the policy
         for state in range(self.grid_world.get_state_space()):
             old_action = self.policy[state]  # Remember the old action
-            action_space = self.grid_world.get_action_space()
-            # Find the action that maximizes the Q-value (greedy improvement)
-            q_values = [self.get_q_value(state, action) for action in range(action_space)]
-            new_action = np.argmax(q_values)
-            # Update the policy with the greedy action
-            self.policy[state] = new_action
-            # Check if the policy has changed
-            if old_action != new_action:
+            argmax_act = 0
+            max_q_value = -100000
+            for action in range( self.grid_world.get_action_space() ):
+                q_value = self.get_q_value(state, action)
+                if q_value > max_q_value:
+                    max_q_value = q_value
+                    argmax_act = action
+            self.policy[state] = argmax_act
+            if old_action != argmax_act:
                 policy_stable = False
         return policy_stable
-        # raise NotImplementedError
 
     def run(self) -> None:
         """Run the algorithm until convergence"""
         # TODO: Implement the policy iteration algorithm until convergence
         while True:
-            # Step 1: Policy Evaluation
             self.policy_evaluation()
-            # Step 2: Policy Improvement
             if self.policy_improvement():
-                # Step 3: Stop if the policy is stable (i.e., no further changes)
                 break
-        # raise NotImplementedError
 
 
 class ValueIteration(DynamicProgramming):
@@ -212,50 +206,47 @@ class ValueIteration(DynamicProgramming):
         """
         # TODO: Get the value for a state by calculating the q-values
         action_space = self.grid_world.get_action_space()
-        # Compute Q-values for all actions and return the maximum Q-value
-        q_values = [self.get_q_value(state, action) for action in range(action_space)]
-        return np.max(q_values)
-        # raise NotImplementedError
+        max = -10000
+        for action in range(action_space):
+            q_value = self.get_q_value(state, action)
+            if q_value > max:
+                max = q_value
+        return max
 
     def policy_evaluation(self):
         """Evaluate the policy and update the values"""
         # TODO: Implement the policy evaluation step
         """Perform one iteration of value iteration, updating all state values."""
-        new_values = np.zeros_like(self.values)  # Initialize a new array to store updated values
-        
-        # Iterate over all states
+        new_values = np.zeros_like(self.values) 
         for state in range(self.grid_world.get_state_space()):
-            new_values[state] = self.get_state_value(state)  # Update each state with the maximum Q-value
-
-        self.values = new_values  # Update the values with the newly computed values
-
-        # raise NotImplementedError
+            new_values[state] = self.get_state_value(state) 
+        self.values = new_values
 
     def policy_improvement(self):
         """Improve the policy based on the evaluated values"""
         # TODO: Implement the policy improvement step
+        # find the argmax action
         for state in range(self.grid_world.get_state_space()):
             action_space = self.grid_world.get_action_space()
-            # For each state, find the action that maximizes the Q-value
-            q_values = [self.get_q_value(state, action) for action in range(action_space)]
-            self.policy[state] = np.argmax(q_values)  # Update the policy with the greedy action
-        # raise NotImplementedError
+            max = -10000
+            max_action = 0
+            for action in range(action_space):
+                q_value = self.get_q_value(state, action)
+                if q_value > max:
+                    max = q_value
+                    max_action = action
+            self.policy[state] = max_action
 
     def run(self) -> None:
         """Run the algorithm until convergence"""
         # TODO: Implement the value iteration algorithm until convergence
-        print(self.values)
         while True:
-            old_values = self.values.copy()  # Store the old values for convergence check
-            self.policy_evaluation()  # Perform one step of value iteration
-            delta = np.max(np.abs(self.values - old_values))  # Compute the maximum difference between old and new values
-            
-            if delta < self.threshold:  # If the values have converged (i.e., the change is smaller than the threshold)
+            old_values = self.values.copy()
+            self.policy_evaluation() 
+            delta = np.max(np.abs(self.values - old_values))
+            if delta < self.threshold: 
                 break
-        
-        # Once the values have converged, extract the optimal policy
         self.policy_improvement()
-        # raise NotImplementedError
 
 
 class AsyncDynamicProgramming(DynamicProgramming):
@@ -267,83 +258,87 @@ class AsyncDynamicProgramming(DynamicProgramming):
             discount_factor (float, optional): Discount factor gamma. Defaults to 1.0.
         """
         super().__init__(grid_world, discount_factor)
+    def get_state_value(self, state: int) -> float:
+        action_space = self.grid_world.get_action_space()
+        max = -10000
+        for action in range(action_space):
+            q_value = self.get_q_value(state, action)
+            if q_value > max:
+                max = q_value
+        return max
     
+    def get_state_value_next_state(self, state: int):
+        action_space = self.grid_world.get_action_space()
+        max = -10000
+        tmp_state = -1
+        for action in range(action_space):
+            q_value,next_state = self.get_q_value_next_state(state, action)
+            if q_value > max:
+                max = q_value
+                tmp_state = next_state
+        return max, tmp_state
+
     def policy_improvement(self):
         """Improve the policy based on the evaluated values"""
         # TODO: Implement the policy improvement step
+        # find the argmax action
         for state in range(self.grid_world.get_state_space()):
             action_space = self.grid_world.get_action_space()
-            # For each state, find the action that maximizes the Q-value
-            q_values = [self.get_q_value(state, action) for action in range(action_space)]
-            self.policy[state] = np.argmax(q_values)  # Update the policy with the greedy action
-        # raise NotImplementedError
+            max = -10000
+            max_action = 0
+            for action in range(action_space):
+                q_value = self.get_q_value(state, action)
+                if q_value > max:
+                    max = q_value
+                    max_action = action
+            self.policy[state] = max_action
     
-    def InplaceDP(self):
+    def InplaceDP(self): ## based on value iteration that only stores one copy of value function
         while True:
             delta = 0
             for state in range(self.grid_world.get_state_space()):
-                # Save the old value for convergence check
                 old_value = self.values[state]
-                # Perform in-place value update using the Bellman equation
-                action_space = self.grid_world.get_action_space()
-                q_values = [self.get_q_value(state, action) for action in range(action_space)]
-                self.values[state] = np.max(q_values)
-                # Track the largest change across all states
+                self.values[state] = self.get_state_value(state)
                 delta = max(delta, abs(old_value - self.values[state]))
-            # Stop if the largest change is smaller than the threshold
             if delta < self.threshold:
                 break
-        # Extract the optimal policy
         self.policy_improvement()
 
-    def PrioritizedSweeping(self):
+    def PrioritizedSweeping(self,threshold):
         # Priority queue to store the states and their priorities
         priority_queue = []
-        # Add all states to the priority queue with initial priority 0
+        predecessors = []
         for state in range(self.grid_world.get_state_space()):
+            predecessors.append([])
             priority_queue.append((0, state))
-            priority_queue.sort(reverse=True, key=lambda x: x[0])
-
-        while priority_queue:
+        
+        while len(priority_queue) != 0:
             # Get the state with the highest priority
             state = priority_queue.pop(0)[1]
-            # Perform the value update
             old_value = self.values[state]
-            action_space = self.grid_world.get_action_space()
-            q_values = [self.get_q_value(state, action) for action in range(action_space)]
-            self.values[state] = np.max(q_values)
-            # Calculate the change in value
-            delta = abs(old_value - self.values[state])
-            # If the change is significant, update the priorities of neighboring states
-            if delta > self.threshold:
-                for neighbor_state in range(self.grid_world.get_state_space()):
-                    priority_queue.append((-delta, neighbor_state))
+            self.values[state], next = self.get_state_value_next_state(state)
+            if state not in predecessors[next]:
+                predecessors[next].append(state)
+            bellman_error = abs(old_value - self.values[state])
+            # print(bellman_error)
+            if bellman_error > threshold:
+                for neighbor_state in predecessors[state]:
+                    priority_queue.append((bellman_error, neighbor_state))
                     priority_queue.sort(reverse=True, key=lambda x: x[0])
-
         # Extract the optimal policy
         self.policy_improvement()
 
     def realTimeDP(self):
-        start_state = 0
-        state = start_state
+        #for s in range(self.grid_world.get_state_space()):
+        state = 0
         steps = 0
-        max_steps = 200
+        max_steps = 500
         while steps < max_steps:
-            # Perform in-place value update for the current state
-            action_space = self.grid_world.get_action_space()
-            q_values = [self.get_q_value(state, action) for action in range(action_space)]
-            self.values[state] = np.max(q_values)
-
-            # Choose the best action according to the current values
-            best_action = np.argmax(q_values)
-            next_state, _, done = self.grid_world.step(state, best_action)
-
+            self.values[state], next = self.get_state_value_next_state(state)
             # Stop if we reach a terminal state
-            if done:
+            if next == -1:
                 break
-
-            # Move to the next state
-            state = next_state
+            state = next
             steps += 1
 
         # Extract the optimal policy
@@ -352,5 +347,3 @@ class AsyncDynamicProgramming(DynamicProgramming):
         """Run the algorithm until convergence"""
         # TODO: Implement the async dynamic programming algorithm until convergence
         self.realTimeDP()
-
-        # raise NotImplementedError
