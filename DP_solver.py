@@ -60,6 +60,7 @@ class DynamicProgramming:
             done_flag = 0
         ## since step is 100% to the next_state, transition probability is 1
         return (reward + self.discount_factor * self.values[next_state] * done_flag)*1
+    
     def get_q_value_next_state(self, state: int, action: int):
         next_state, reward, done = self.grid_world.step(state, action)
         done_flag = 1
@@ -304,7 +305,7 @@ class AsyncDynamicProgramming(DynamicProgramming):
                 break
         self.policy_improvement()
 
-    def PrioritizedSweeping(self,threshold):
+    def PrioritizedSweeping(self,threshold): ## 0.47 for the best performence
         # Priority queue to store the states and their priorities
         priority_queue = []
         predecessors = []
@@ -328,19 +329,29 @@ class AsyncDynamicProgramming(DynamicProgramming):
         # Extract the optimal policy
         self.policy_improvement()
 
-    def realTimeDP(self):
+    def realTimeDP(self): ## best : 240 max_steps
+        
+        # convergence_list = np.zeros_like(self.values) 
         #for s in range(self.grid_world.get_state_space()):
-        state = 0
+        
         steps = 0
-        max_steps = 500
+        max_steps = 240
         while steps < max_steps:
-            self.values[state], next = self.get_state_value_next_state(state)
-            # Stop if we reach a terminal state
-            if next == -1:
-                break
-            state = next
-            steps += 1
-
+            state = 0
+            convergence_list = np.zeros_like(self.values)
+            while state != -1:
+                delta = 0
+                old_value = self.values[state]
+                self.values[state], next = self.get_state_value_next_state(state)
+                delta = max(delta, abs(old_value - self.values[state]))
+                if delta == 0:
+                    convergence_list[state] = 1
+                else:
+                    convergence_list[state] = 0
+                state = next
+                steps += 1
+                if state == -1 or convergence_list[state] == 1:
+                    break
         # Extract the optimal policy
         self.policy_improvement()
     def run(self) -> None:
