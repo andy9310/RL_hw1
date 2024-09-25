@@ -338,21 +338,19 @@ class AsyncDynamicProgramming(DynamicProgramming):
 
     def realTimeDP(self): ## best : 240 max_steps
         
-        # convergence_list = np.zeros_like(self.values) 
-        #for s in range(self.grid_world.get_state_space()):
         index = 0
-        while True:
+        while index < self.grid_world.get_state_space():
             delta = 0
-            state = index % self.grid_world.get_state_space()
-            print(state)
+            state = index
             while state != -1:
                 old_value = self.values[state]
                 self.values[state], next = self.get_state_value_next_state(state)
                 delta = max(delta, abs(old_value - self.values[state]))
                 state = next
             if delta < self.threshold:
-                break
-            index = index + 1
+                index = index + 1
+                    
+        
         # Extract the optimal policy
         self.policy_improvement()
     def run(self) -> None:
