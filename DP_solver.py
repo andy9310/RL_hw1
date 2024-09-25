@@ -356,4 +356,4 @@ class AsyncDynamicProgramming(DynamicProgramming):
     def run(self) -> None:
         """Run the algorithm until convergence"""
         # TODO: Implement the async dynamic programming algorithm until convergence
-        self.realTimeDP()
+        self.InplaceDP()
