@@ -1,5 +1,4 @@
 import numpy as np
-
 from gridworld import GridWorld
 
 
@@ -259,6 +258,10 @@ class AsyncDynamicProgramming(DynamicProgramming):
             discount_factor (float, optional): Discount factor gamma. Defaults to 1.0.
         """
         super().__init__(grid_world, discount_factor)
+        self.predecessors = []
+        self.priority_queue = []
+        self.best_transition = []
+
     def get_state_value(self, state: int) -> float:
         action_space = self.grid_world.get_action_space()
         max = -10000
@@ -304,54 +307,52 @@ class AsyncDynamicProgramming(DynamicProgramming):
             if delta < self.threshold:
                 break
         self.policy_improvement()
+    
+    def update_state(self, state): ## for priority sweeping 
+        old_value = self.values[state]
+        self.values[state] = self.get_state_value(state)
+        bellman_error = abs(old_value - self.values[state])
+        if bellman_error > self.threshold:
+            self.priority_queue.append((bellman_error, state))
+            self.priority_queue.sort(reverse=True, key=lambda x: x[0])
+            for pred_state in range(self.grid_world.get_state_space()):
+                if pred_state != state:
+                    old_value = self.values[pred_state]
+                    self.values[pred_state] = self.get_state_value(pred_state)
+                    bellman_error = abs(old_value - self.values[pred_state])
+                    if bellman_error > self.threshold:
+                        self.priority_queue = [(bellman_error, pred_state) if item[1] == pred_state else item for item in self.priority_queue]
+                        # self.priority_queue.append((bellman_error, pred_state))
+                        self.priority_queue.sort(reverse=True, key=lambda x: x[0])
 
-    def PrioritizedSweeping(self,threshold): ## 0.47 for the best performence
-        # Priority queue to store the states and their priorities
-        priority_queue = []
-        predecessors = []
-        for state in range(self.grid_world.get_state_space()):
-            predecessors.append([])
-            priority_queue.append((0, state))
+    
+    def PrioritizedSweeping(self): 
         
-        while len(priority_queue) != 0:
-            # Get the state with the highest priority
-            state = priority_queue.pop(0)[1]
-            old_value = self.values[state]
-            self.values[state], next = self.get_state_value_next_state(state)
-            if state not in predecessors[next]:
-                predecessors[next].append(state)
-            bellman_error = abs(old_value - self.values[state])
-            # print(bellman_error)
-            if bellman_error > threshold:
-                for neighbor_state in predecessors[state]:
-                    priority_queue.append((bellman_error, neighbor_state))
-                    priority_queue.sort(reverse=True, key=lambda x: x[0])
-        # Extract the optimal policy
+        for state in range(self.grid_world.get_state_space()):
+            self.priority_queue.append((0, state))
+        
+        while len(self.priority_queue) != 0:
+            state = self.priority_queue.pop(0)[1]
+            self.update_state(state)
         self.policy_improvement()
 
     def realTimeDP(self): ## best : 240 max_steps
         
         # convergence_list = np.zeros_like(self.values) 
         #for s in range(self.grid_world.get_state_space()):
-        
-        steps = 0
-        max_steps = 240
-        while steps < max_steps:
-            state = 0
-            convergence_list = np.zeros_like(self.values)
+        index = 0
+        while True:
+            delta = 0
+            state = index % self.grid_world.get_state_space()
+            print(state)
             while state != -1:
-                delta = 0
                 old_value = self.values[state]
                 self.values[state], next = self.get_state_value_next_state(state)
                 delta = max(delta, abs(old_value - self.values[state]))
-                if delta == 0:
-                    convergence_list[state] = 1
-                else:
-                    convergence_list[state] = 0
                 state = next
-                steps += 1
-                if state == -1 or convergence_list[state] == 1:
-                    break
+            if delta < self.threshold:
+                break
+            index = index + 1
         # Extract the optimal policy
         self.policy_improvement()
     def run(self) -> None:
